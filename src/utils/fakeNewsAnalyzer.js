@@ -1,10 +1,9 @@
 /**
- * TruthLens Multi-Lingual AI Fake News & Misinformation Engine v4.0
- * Supports Any Language News Analysis & Wikipedia Live Database Verification
+ * TruthLens AI Fake News Engine v5.0
+ * Powered by Google Gemini AI & Multi-Lingual Fact-Checking
  */
 
-import { analyzeWithOllama } from './ollamaService';
-import { analyzeWithCloudAI } from './llmService';
+import { analyzeWithGemini } from './geminiService';
 import { searchWikipediaCredibility } from './wikipediaService';
 
 export const SAMPLE_ARTICLES = [
@@ -35,26 +34,25 @@ The findings, published in the peer-reviewed Astrophysical Journal Letters, repr
   }
 ];
 
-// Multi-Lingual Clickbait & Misinformation Indicators
-const CLICKBAIT_INDICATORS = [
-  'shocking secret', 'they don\'t want you to know', 'banned from the internet',
-  'miracle cure', 'instantly cure', '100% proven', 'doctors shocked',
-  'you won\'t believe', 'big pharma hiding', 'secret remedy', 'magic root',
+const STRICT_FAKE_PATTERNS = [
+  'miracle cure', 'cures all', '100% proven', 'banned from the internet',
+  'doctors shocked', 'secret tea', 'magic root', 'eradicates every virus',
+  'big pharma hiding', 'secret laboratory', 'guaranteed remedy',
   'चौंकाने वाला', 'गुप्त चमत्कार', 'डॉक्टर हैरान', '100% इलाज', 'गुप्त नुस्खा',
-  'secreto impactante', 'cura milagrosa', 'remedio secreto', 'révélation choc'
+  'secreto impactante', 'cura milagrosa', 'remedio secreto'
 ];
 
-// Reputable Source Attribution Keywords (Multi-Lingual)
-const REPUTABLE_KEYWORDS = [
-  'nasa', 'isro', 'who', 'cdc', 'reuters', 'associated press', 'bbc', 'the guardian',
-  'published in', 'according to', 'peer-reviewed', 'official statement', 'university',
-  'इसरो', 'नासा', 'विश्व स्वास्थ्य संगठन', 'शोधकर्ताओं के अनुसार', 'अधिसूचना',
-  'selon', 'd\'après', 'según', 'publicado en'
+const OFFICIAL_SOURCES = [
+  'nasa', 'isro', 'who', 'cdc', 'reuters', 'associated press', 'bbc',
+  'astrophysical journal', 'goddard space flight', ' world health organization',
+  'इसरो', 'नासा', 'विश्व स्वास्थ्य संगठन'
 ];
 
 /**
  * Main Async Analysis Function
- * Works in Any Language & Cross-References Wikipedia + Social Media Consensus
+ * 1. Calls Google Gemini API if key provided.
+ * 2. Cross-references Wikipedia API.
+ * 3. Evaluates with strict multi-lingual heuristics.
  */
 export async function analyzeNewsContentAsync(rawInput, inputType = 'text', apiSettings = {}) {
   const text = (rawInput || '').trim();
@@ -63,104 +61,67 @@ export async function analyzeNewsContentAsync(rawInput, inputType = 'text', apiS
     throw new Error('Please provide news text, a headline, an image, or URL to analyze.');
   }
 
-  // 1. Cross-Reference Wikipedia Database in Real-Time
-  const wikiData = await searchWikipediaCredibility(text);
+  const apiKey = apiSettings.geminiApiKey || apiSettings.apiKey;
 
-  const { provider, apiKey, ollamaEndpoint, ollamaModel } = apiSettings;
-
-  // 2. If Cloud AI Key is available, use LLM
+  // 1. If Google Gemini API key is configured, call Gemini API
   if (apiKey && apiKey.trim().length > 10) {
     try {
-      const cloudData = await analyzeWithCloudAI({ text, apiKey, provider });
-      const formatted = formatAIResponse(cloudData, text, inputType, 'Cloud AI Engine (Llama 3 / GPT)');
-      formatted.wikiData = wikiData;
-      return formatted;
+      const geminiData = await analyzeWithGemini({ text, apiKey });
+      const wikiData = await searchWikipediaCredibility(text);
+      return formatGeminiResponse(geminiData, text, inputType, wikiData);
     } catch (err) {
-      console.warn('Cloud AI API call failed, falling back to multi-lingual engine:', err.message);
+      console.warn('Google Gemini API call failed, using multi-lingual heuristic engine:', err.message);
     }
   }
 
-  // 3. If Ollama Local is active
-  if (provider === 'ollama') {
-    try {
-      const ollamaData = await analyzeWithOllama({
-        text,
-        endpoint: ollamaEndpoint || 'http://localhost:11434',
-        model: ollamaModel || 'llama3',
-        apiKey: apiKey || ''
-      });
-      const formatted = formatAIResponse(ollamaData, text, inputType, `Ollama Local AI (${ollamaModel || 'llama3'})`);
-      formatted.wikiData = wikiData;
-      return formatted;
-    } catch (err) {
-      console.warn('Ollama connection unavailable, falling back to multi-lingual engine:', err.message);
-    }
-  }
+  // 2. Wikipedia Cross-Check
+  const wikiData = await searchWikipediaCredibility(text);
 
-  // 4. Default Multi-Lingual Heuristic Engine
-  return analyzeNewsMultiLingualHeuristic(text, inputType, wikiData);
+  // 3. Fallback Heuristics
+  return analyzeStrictHeuristics(text, inputType, wikiData);
 }
 
 /**
- * Multi-Lingual Heuristic Analyzer with Wikipedia & Social Media Consensus
+ * Strict Multi-Lingual Heuristic Analyzer
  */
-export function analyzeNewsMultiLingualHeuristic(text, inputType = 'text', wikiData = { hasMatch: false }) {
-  const words = text.split(/\s+/).filter(Boolean);
-  const wordCount = words.length;
+function analyzeStrictHeuristics(text, inputType = 'text', wikiData = { hasMatch: false }) {
   const lowerText = text.toLowerCase();
 
-  // Multi-lingual matches
-  const matchedTriggers = CLICKBAIT_INDICATORS.filter(t => lowerText.includes(t));
-  const matchedAttributions = REPUTABLE_KEYWORDS.filter(r => lowerText.includes(r));
+  const hasFakePattern = STRICT_FAKE_PATTERNS.some(p => lowerText.includes(p));
+  const hasOfficialSource = OFFICIAL_SOURCES.some(s => lowerText.includes(s));
 
-  // Balanced Baseline Score (72 = Fair & Balanced)
-  let truthScore = 72;
+  let truthScore = 55; // Neutral default
 
-  // Add points for Wikipedia database match
-  if (wikiData.hasMatch) {
-    truthScore += 18;
+  if (hasOfficialSource || wikiData.hasMatch) {
+    truthScore = 88;
+  }
+  
+  if (hasFakePattern) {
+    truthScore = 18; // Strict low score for fake news patterns
   }
 
-  // Add points for reputable institutional citations
-  if (matchedAttributions.length > 0) {
-    truthScore += Math.min(matchedAttributions.length * 15, 25);
-  }
-
-  // Deduct points for obvious clickbait / miracle cure phrases
-  if (matchedTriggers.length > 0) {
-    truthScore -= matchedTriggers.length * 28;
-  }
-
-  // Bound truth score strictly between 10 and 98
-  truthScore = Math.max(10, Math.min(98, Math.round(truthScore)));
-
-  const isReal = truthScore >= 68;
+  const isReal = truthScore >= 70;
   const isFake = truthScore < 40;
 
   let verdict = {
     label: isReal ? 'REAL NEWS' : isFake ? 'FAKE NEWS' : 'UNVERIFIED / MIXED',
     subtext: isReal
-      ? (wikiData.hasMatch ? `Verified against Wikipedia database ("${wikiData.title}") & reputable sources.` : 'Matches standard journalistic framing and verifiable facts.')
+      ? (wikiData.hasMatch ? `Verified against Wikipedia database ("${wikiData.title}") & official citations.` : 'Supported by official agency citations and factual reporting.')
       : isFake
-      ? 'Contains unverified claims, clickbait language, or lacks supporting Wikipedia/official evidence.'
-      : 'Unconfirmed assertion. Exercise caution before sharing on social media.',
+      ? 'Unverified medical/scientific claims, clickbait manipulation, or fabricated rumors detected.'
+      : 'Unconfirmed claim. Exercise caution before sharing.',
     badgeClass: isReal ? 'badge-real' : isFake ? 'badge-fake' : 'badge-unverified',
     color: isReal ? '#10b981' : isFake ? '#ef4444' : '#eab308',
-    riskLevel: isReal ? 'Low Risk' : isFake ? 'High Misinformation Risk' : 'Moderate Caution'
+    riskLevel: isReal ? 'Low Risk' : isFake ? 'Critical Risk - Fabricated Claims' : 'Moderate Caution'
   };
 
-  const redFlags = [];
-  if (matchedTriggers.length > 0) {
-    redFlags.push(`Contains recognized sensationalist phrases: "${matchedTriggers.join('", "')}".`);
-  } else if (!wikiData.hasMatch && matchedAttributions.length === 0) {
-    redFlags.push('No direct matching Wikipedia entity or primary news agency attribution found.');
-  } else {
-    redFlags.push('Content matches verifiable knowledge databases and neutral news framing.');
-  }
+  const redFlags = isFake
+    ? ['Promotes unverified miracle cures, clickbait manipulation, or unscientific claims.']
+    : ['Content matches verifiable official sources and neutral news reporting.'];
 
   const recommendedFactChecks = [
     { name: 'Snopes Fact Check', url: `https://www.snopes.com/search/${encodeURIComponent(text.slice(0, 40))}` },
-    { name: 'Wikipedia Search', url: wikiData.url || `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(text.slice(0, 40))}` }
+    { name: 'Google News Search', url: `https://news.google.com/search?q=${encodeURIComponent(text.slice(0, 40))}` }
   ];
 
   return {
@@ -168,43 +129,43 @@ export function analyzeNewsMultiLingualHeuristic(text, inputType = 'text', wikiD
     id: 'eval-' + Math.random().toString(36).substring(2, 9),
     inputText: text,
     inputType,
-    wordCount,
+    wordCount: text.split(/\s+/).filter(Boolean).length,
     truthScore,
     verdict,
     wikiData,
     redFlags,
     recommendedFactChecks,
-    engine: 'TruthLens Multi-Lingual Engine v4.0'
+    engine: 'TruthLens Misinformation Engine v5.0'
   };
 }
 
 /**
- * Formats AI LLM response
+ * Formats Google Gemini API response
  */
-function formatAIResponse(data, text, inputType, engineName) {
-  const truthScore = Math.max(0, Math.min(100, data.truthScore ?? 70));
+function formatGeminiResponse(data, text, inputType, wikiData) {
+  const truthScore = Math.max(0, Math.min(100, data.truthScore ?? 50));
   const isReal = truthScore >= 68;
   const isFake = truthScore < 40;
 
   return {
     timestamp: new Date().toISOString(),
-    id: 'ai-' + Math.random().toString(36).substring(2, 9),
+    id: 'gemini-' + Math.random().toString(36).substring(2, 9),
     inputText: text,
     inputType,
     wordCount: text.split(/\s+/).filter(Boolean).length,
     truthScore,
     verdict: {
       label: isReal ? 'REAL NEWS' : isFake ? 'FAKE NEWS' : 'UNVERIFIED',
-      subtext: `Verified by ${engineName}.`,
+      subtext: data.explanation || `Verified by Google Gemini AI.`,
       badgeClass: isReal ? 'badge-real' : isFake ? 'badge-fake' : 'badge-unverified',
       color: isReal ? '#10b981' : isFake ? '#ef4444' : '#eab308',
-      riskLevel: data.riskLevel || 'AI Verified'
+      riskLevel: isReal ? 'Low Risk' : isFake ? 'High Misinformation Risk' : 'Moderate Caution'
     },
-    wikiData: { hasMatch: false },
-    redFlags: data.redFlags || ['AI verification complete.'],
+    wikiData,
+    redFlags: [data.explanation || 'Verified via Google Gemini AI.'],
     recommendedFactChecks: [
-      { name: 'Snopes Fact Check', url: `https://www.snopes.com/search/${encodeURIComponent(text.slice(0, 40))}` }
+      { name: 'Google News Search', url: `https://news.google.com/search?q=${encodeURIComponent(text.slice(0, 40))}` }
     ],
-    engine: engineName
+    engine: 'Google Gemini 1.5 Flash AI'
   };
 }

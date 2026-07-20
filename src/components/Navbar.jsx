@@ -1,8 +1,8 @@
 import React from 'react';
-import { ShieldCheck, History, Key, Activity, Cpu } from 'lucide-react';
+import { ShieldCheck, History, Key, Sparkles } from 'lucide-react';
 
 export default function Navbar({ onOpenHistory, onOpenApiModal, onLogoClick, historyCount = 0, apiSettings = {} }) {
-  const isOllama = apiSettings.provider === 'ollama';
+  const hasGeminiKey = Boolean(apiSettings.geminiApiKey || apiSettings.apiKey);
 
   return (
     <nav className="glass-panel" style={{ padding: '0.85rem 1.5rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -20,7 +20,7 @@ export default function Navbar({ onOpenHistory, onOpenApiModal, onLogoClick, his
           justifyContent: 'center',
           boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)',
           transition: 'transform 0.2s ease'
-        }} className="sample-card-btn">
+        }}>
           <ShieldCheck size={26} color="#ffffff" />
         </div>
         <div>
@@ -35,7 +35,7 @@ export default function Navbar({ onOpenHistory, onOpenApiModal, onLogoClick, his
               padding: '2px 6px', 
               borderRadius: '6px',
               textTransform: 'uppercase'
-            }}>AI v3.0</span>
+            }}>Gemini AI</span>
           </div>
           <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Real-Time Misinformation & Fake News Detector</p>
         </div>
@@ -49,14 +49,14 @@ export default function Navbar({ onOpenHistory, onOpenApiModal, onLogoClick, his
           gap: '0.4rem', 
           padding: '0.4rem 0.8rem', 
           borderRadius: '50px', 
-          background: isOllama ? 'rgba(99, 102, 241, 0.15)' : 'rgba(16, 185, 129, 0.1)', 
-          border: isOllama ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(16, 185, 129, 0.3)',
+          background: hasGeminiKey ? 'rgba(99, 102, 241, 0.18)' : 'rgba(16, 185, 129, 0.1)', 
+          border: hasGeminiKey ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid rgba(16, 185, 129, 0.3)',
           fontSize: '0.75rem',
-          color: isOllama ? '#a5b4fc' : '#34d399',
+          color: hasGeminiKey ? '#a5b4fc' : '#34d399',
           fontWeight: '600'
         }}>
-          {isOllama ? <Cpu size={14} className="animate-pulse-glow" /> : <Activity size={14} className="animate-pulse-glow" />}
-          <span>{isOllama ? `Ollama (${apiSettings.ollamaModel || 'llama3'})` : 'NLP Engine Active'}</span>
+          <Sparkles size={14} className="animate-pulse-glow" />
+          <span>{hasGeminiKey ? 'Google Gemini AI Active' : 'Gemini AI Ready'}</span>
         </div>
 
         {/* Engine Settings Button */}
@@ -64,10 +64,10 @@ export default function Navbar({ onOpenHistory, onOpenApiModal, onLogoClick, his
           onClick={onOpenApiModal}
           className="btn-secondary"
           style={{ padding: '0.5rem 0.9rem', fontSize: '0.82rem' }}
-          title="AI Engine Configuration"
+          title="Google Gemini Key Configuration"
         >
           <Key size={15} />
-          <span className="hide-mobile">AI Engine</span>
+          <span className="hide-mobile">Gemini Key</span>
         </button>
 
         {/* History Button */}
