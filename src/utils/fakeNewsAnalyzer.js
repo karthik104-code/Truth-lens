@@ -1,6 +1,6 @@
 /**
- * TruthLens AI Fake News Engine v5.0
- * Powered by Google Gemini AI & Multi-Lingual Fact-Checking
+ * TruthLens AI Fake News Verification Engine v6.0
+ * Powered by Google Gemini AI, Wikipedia API & Strict Multi-Lingual Verification
  */
 
 import { analyzeWithGemini } from './geminiService';
@@ -34,25 +34,26 @@ The findings, published in the peer-reviewed Astrophysical Journal Letters, repr
   }
 ];
 
-const STRICT_FAKE_PATTERNS = [
+// Recognized Fake News & Misinformation Trigger Words across languages
+const FAKE_PATTERNS = [
   'miracle cure', 'cures all', '100% proven', 'banned from the internet',
   'doctors shocked', 'secret tea', 'magic root', 'eradicates every virus',
-  'big pharma hiding', 'secret laboratory', 'guaranteed remedy',
+  'big pharma hiding', 'secret laboratory', 'guaranteed remedy', 'instant fix',
+  'alien coverup', 'flat earth', '5g temperature', 'microchips in vaccines',
   'चौंकाने वाला', 'गुप्त चमत्कार', 'डॉक्टर हैरान', '100% इलाज', 'गुप्त नुस्खा',
   'secreto impactante', 'cura milagrosa', 'remedio secreto'
 ];
 
-const OFFICIAL_SOURCES = [
+// Official Recognized News & Institutional Sources
+const VERIFIED_INSTITUTIONS = [
   'nasa', 'isro', 'who', 'cdc', 'reuters', 'associated press', 'bbc',
-  'astrophysical journal', 'goddard space flight', ' world health organization',
-  'इसरो', 'नासा', 'विश्व स्वास्थ्य संगठन'
+  'astrophysical journal', 'goddard space flight', 'world health organization',
+  'इसरो', 'नासा', 'विश्व स्वास्थ्य संगठन', 'press briefing', 'court documents'
 ];
 
 /**
  * Main Async Analysis Function
- * 1. Calls Google Gemini API if key provided.
- * 2. Cross-references Wikipedia API.
- * 3. Evaluates with strict multi-lingual heuristics.
+ * Checks Google Gemini API -> Wikipedia API -> Strict Heuristic Engine
  */
 export async function analyzeNewsContentAsync(rawInput, inputType = 'text', apiSettings = {}) {
   const text = (rawInput || '').trim();
@@ -61,23 +62,24 @@ export async function analyzeNewsContentAsync(rawInput, inputType = 'text', apiS
     throw new Error('Please provide news text, a headline, an image, or URL to analyze.');
   }
 
+  const wikiData = await searchWikipediaCredibility(text);
   const apiKey = apiSettings.geminiApiKey || apiSettings.apiKey;
 
-  // 1. If Google Gemini API key is configured, call Gemini API
-  if (apiKey && apiKey.trim().length > 10) {
+  // 1. Call Google Gemini AI if API key is provided
+  if (apiKey && apiKey.trim().length > 5) {
     try {
       const geminiData = await analyzeWithGemini({ text, apiKey });
-      const wikiData = await searchWikipediaCredibility(text);
       return formatGeminiResponse(geminiData, text, inputType, wikiData);
     } catch (err) {
-      console.warn('Google Gemini API call failed, using multi-lingual heuristic engine:', err.message);
+      console.warn('Google Gemini API error:', err.message);
+      // Fall through to strict heuristic engine with warning note
+      const fallback = analyzeStrictHeuristics(text, inputType, wikiData);
+      fallback.verdict.subtext += ` (Gemini API Warning: ${err.message.slice(0, 80)}. Evaluated via TruthLens Strict Engine).`;
+      return fallback;
     }
   }
 
-  // 2. Wikipedia Cross-Check
-  const wikiData = await searchWikipediaCredibility(text);
-
-  // 3. Fallback Heuristics
+  // 2. Fallback Strict Heuristics Engine
   return analyzeStrictHeuristics(text, inputType, wikiData);
 }
 
@@ -87,37 +89,39 @@ export async function analyzeNewsContentAsync(rawInput, inputType = 'text', apiS
 function analyzeStrictHeuristics(text, inputType = 'text', wikiData = { hasMatch: false }) {
   const lowerText = text.toLowerCase();
 
-  const hasFakePattern = STRICT_FAKE_PATTERNS.some(p => lowerText.includes(p));
-  const hasOfficialSource = OFFICIAL_SOURCES.some(s => lowerText.includes(s));
+  const hasFakePattern = FAKE_PATTERNS.some(p => lowerText.includes(p));
+  const hasOfficialSource = VERIFIED_INSTITUTIONS.some(s => lowerText.includes(s));
 
-  let truthScore = 55; // Neutral default
+  let truthScore = 48; // Unverified neutral default
 
   if (hasOfficialSource || wikiData.hasMatch) {
-    truthScore = 88;
+    truthScore = 88; // REAL NEWS
   }
-  
+
   if (hasFakePattern) {
-    truthScore = 18; // Strict low score for fake news patterns
+    truthScore = 15; // FAKE NEWS
   }
 
   const isReal = truthScore >= 70;
   const isFake = truthScore < 40;
 
   let verdict = {
-    label: isReal ? 'REAL NEWS' : isFake ? 'FAKE NEWS' : 'UNVERIFIED / MIXED',
+    label: isReal ? 'REAL NEWS' : isFake ? 'FAKE NEWS' : 'UNVERIFIED / SUSPICIOUS',
     subtext: isReal
-      ? (wikiData.hasMatch ? `Verified against Wikipedia database ("${wikiData.title}") & official citations.` : 'Supported by official agency citations and factual reporting.')
+      ? (wikiData.hasMatch ? `Verified against Wikipedia database ("${wikiData.title}") & official records.` : 'Supported by official agency citations and neutral news reporting.')
       : isFake
-      ? 'Unverified medical/scientific claims, clickbait manipulation, or fabricated rumors detected.'
-      : 'Unconfirmed claim. Exercise caution before sharing.',
+      ? 'Contains unverified claims, clickbait manipulation, pseudoscience, or viral hoaxes.'
+      : 'Unconfirmed assertion lacking primary source citations. Exercise caution.',
     badgeClass: isReal ? 'badge-real' : isFake ? 'badge-fake' : 'badge-unverified',
     color: isReal ? '#10b981' : isFake ? '#ef4444' : '#eab308',
-    riskLevel: isReal ? 'Low Risk' : isFake ? 'Critical Risk - Fabricated Claims' : 'Moderate Caution'
+    riskLevel: isReal ? 'Low Risk' : isFake ? 'High Misinformation Risk' : 'Moderate Caution'
   };
 
   const redFlags = isFake
-    ? ['Promotes unverified miracle cures, clickbait manipulation, or unscientific claims.']
-    : ['Content matches verifiable official sources and neutral news reporting.'];
+    ? ['Promotes unverified miracle remedies, viral hoaxes, or fabricated claims.']
+    : isReal
+    ? ['Matches verified knowledge databases and official news citations.']
+    : ['Lacks primary source citation from official news or research bodies.'];
 
   const recommendedFactChecks = [
     { name: 'Snopes Fact Check', url: `https://www.snopes.com/search/${encodeURIComponent(text.slice(0, 40))}` },
@@ -135,7 +139,7 @@ function analyzeStrictHeuristics(text, inputType = 'text', wikiData = { hasMatch
     wikiData,
     redFlags,
     recommendedFactChecks,
-    engine: 'TruthLens Misinformation Engine v5.0'
+    engine: 'TruthLens Strict Misinformation Engine v6.0'
   };
 }
 
@@ -144,8 +148,13 @@ function analyzeStrictHeuristics(text, inputType = 'text', wikiData = { hasMatch
  */
 function formatGeminiResponse(data, text, inputType, wikiData) {
   const truthScore = Math.max(0, Math.min(100, data.truthScore ?? 50));
-  const isReal = truthScore >= 68;
-  const isFake = truthScore < 40;
+
+  let label = data.verdictLabel || (truthScore >= 70 ? 'REAL NEWS' : truthScore < 40 ? 'FAKE NEWS' : 'UNVERIFIED / MIXED');
+  if (data.verdictLabel && data.verdictLabel.includes('FAKE')) label = 'FAKE NEWS';
+  if (data.verdictLabel && data.verdictLabel.includes('REAL')) label = 'REAL NEWS';
+
+  const isReal = label === 'REAL NEWS';
+  const isFake = label === 'FAKE NEWS';
 
   return {
     timestamp: new Date().toISOString(),
@@ -155,8 +164,8 @@ function formatGeminiResponse(data, text, inputType, wikiData) {
     wordCount: text.split(/\s+/).filter(Boolean).length,
     truthScore,
     verdict: {
-      label: isReal ? 'REAL NEWS' : isFake ? 'FAKE NEWS' : 'UNVERIFIED',
-      subtext: data.explanation || `Verified by Google Gemini AI.`,
+      label,
+      subtext: data.explanation || `Evaluated by Google Gemini AI.`,
       badgeClass: isReal ? 'badge-real' : isFake ? 'badge-fake' : 'badge-unverified',
       color: isReal ? '#10b981' : isFake ? '#ef4444' : '#eab308',
       riskLevel: isReal ? 'Low Risk' : isFake ? 'High Misinformation Risk' : 'Moderate Caution'

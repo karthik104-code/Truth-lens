@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, History, Trash2, Clock, ShieldCheck, AlertTriangle, ArrowRight } from 'lucide-react';
+import { X, History, Trash2, Clock, ArrowRight } from 'lucide-react';
 
 export default function HistoryDrawer({ isOpen, onClose, history, onSelectHistoryItem, onClearHistory }) {
   if (!isOpen) return null;

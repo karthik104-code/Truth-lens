@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Key, X, Check, Lock, Sparkles, Cpu, Globe } from 'lucide-react';
+import { Key, X, Check, Lock, Sparkles } from 'lucide-react';
 
 export default function ApiModal({ isOpen, onClose, apiSettings = {}, onSaveSettings }) {
-  const [provider, setProvider] = useState(apiSettings.provider || 'gemini');
+  const [provider] = useState(apiSettings.provider || 'gemini');
   const [geminiApiKey, setGeminiApiKey] = useState(apiSettings.geminiApiKey || apiSettings.apiKey || '');
   const [saved, setSaved] = useState(false);
 

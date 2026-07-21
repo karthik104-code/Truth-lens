@@ -20,10 +20,9 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isApiModalOpen, setIsApiModalOpen] = useState(false);
   const [apiSettings, setApiSettings] = useState({
-    provider: 'nlp',
-    ollamaEndpoint: 'http://localhost:11434',
-    ollamaModel: 'llama3',
-    apiKey: 'eeccc418d9664fd3856615691eda1537.nZuXlSB93y4umNVco-4d-9JD'
+    provider: 'gemini',
+    geminiApiKey: '',
+    apiKey: ''
   });
 
   // Load history & API settings from localStorage on mount
@@ -81,14 +80,14 @@ export default function App() {
     setHistory([]);
     try {
       localStorage.removeItem('truthlens_history');
-    } catch (e) {}
+    } catch {}
   };
 
   const handleSaveSettings = (newSettings) => {
     setApiSettings(newSettings);
     try {
       localStorage.setItem('truthlens_api_settings', JSON.stringify(newSettings));
-    } catch (e) {}
+    } catch {}
   };
 
   return (

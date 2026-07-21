@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, Flame, CheckCircle, ExternalLink, Globe } from 'lucide-react';
+import { Flame, ExternalLink } from 'lucide-react';
 
 const TRENDING_DEBUNKS = [
   {
